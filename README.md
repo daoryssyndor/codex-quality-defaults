@@ -28,6 +28,14 @@ Restart Codex and start a new session after installation.
 - Updates only these top-level configuration keys: `model_auto_compact_token_limit`, `model_auto_compact_token_limit_scope`, `tool_output_token_limit`, and `model_context_window`. The last is removed to use the model's native window.
 - Preserves model selection, reasoning effort, permissions, integrations, worker settings, profiles, and other configuration. Missing `config.toml` is created.
 
+### Context7 compatibility
+
+Existing Context7 MCP settings are preserved, including command/arguments, URL, headers, environment variables, credentials, timeouts, and tool settings. The installer removes an isolated `mcp_servers.context7.type` assignment because Codex ignores it; the transport is configured through `command` (stdio) or `url` (HTTP). See the [official MCP configuration documentation](https://developers.openai.com/codex/mcp). It does not install Context7 or change its endpoint or credentials.
+
+If `type` is embedded inside a compound inline table, the installer preserves that table and prints a notice to remove only that field manually. Other servers and fields named `type` inside headers/environment variables are preserved. Restoration includes the original Context7 configuration.
+
+After updating this repository, run `sh install.sh` again on each machine and restart Codex. In a session, use `/mcp` to inspect the connection status. An ignored-setting warning alone does not mean the MCP connection failed.
+
 For the verified Codex CLI **0.159.0**, an explicit supported model (`gpt-6.1-sol`, `gpt-6-astra`, or `gpt-6-sol`), and fresh matching model metadata, it installs:
 
 ```toml

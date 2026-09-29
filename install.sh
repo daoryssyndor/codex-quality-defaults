@@ -98,12 +98,24 @@ def edit_config(text, numeric):
     old = tomllib.loads(text)
     kept = []
     at_root = True
+    header = ''
+    removed_context7_type = False
     for statement in statements(text):
         stripped = statement.strip()
         if stripped in markers:
             continue
         if stripped.startswith('['):
             at_root = False
+            header = statement
+        elif stripped and not stripped.startswith('#'):
+            scoped = tomllib.loads(header + statement)
+            target = scoped.get('mcp_servers', {}).get('context7', {})
+            if isinstance(target, dict) and 'type' in target:
+                # Remove only an isolated unsupported assignment, never a server
+                # definition or credentials embedded in a compound assignment.
+                if scoped == {'mcp_servers': {'context7': {'type': target['type']}}}:
+                    removed_context7_type = True
+                    continue
         if at_root:
             item = tomllib.loads(statement)
             if set(item) & settings:
@@ -121,6 +133,8 @@ def edit_config(text, numeric):
     lines += ['# END codex-quality-defaults', '']
     result = '\n'.join(lines) + '\n' + ''.join(kept).lstrip('\n')
     expected = copy.deepcopy(old)
+    if removed_context7_type:
+        expected['mcp_servers']['context7'].pop('type', None)
     for key in settings:
         expected.pop(key, None)
     if numeric:
@@ -246,6 +260,12 @@ def main():
         }
         notes = [reason, 'Preserve model, effort, permissions, integrations, profiles, and worker feature choices.',
                  'Remove any top-level model_context_window override; use the native window.']
+        context7 = config.get('mcp_servers', {}).get('context7', {})
+        updated_context7 = tomllib.loads(desired['config.toml'][0].decode()).get('mcp_servers', {}).get('context7', {})
+        if 'type' in context7 and 'type' not in updated_context7:
+            notes.append('Remove unsupported Context7 type assignment; preserve all connection and authentication settings.')
+        elif 'type' in context7:
+            notes.append('NOTICE: Context7 type is inside a compound assignment; preserved unchanged. Remove that unsupported field manually.')
         if before['AGENTS.override.md'] is not None:
             notes.append('Back up and remove AGENTS.override.md so the new global AGENTS.md is active.')
         if config.get('profile') or any(root.glob('*.config.toml')) or config.get('profiles'):
